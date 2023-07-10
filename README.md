@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/616735576.svg)](https://zenodo.org/badge/latestdoi/616735576)
+
 # SliDeFS
 SliDeFS (Slip Deficit From Strain) is a method for inverting surface strain rate components for slip deficit rate on faults as described in Johnson et al. (2022). Faults are discretized into rectangular slip patches and the Okada (1985) solution is used to relate slip deficit rate (backslip) to surface strain rates (Exx, Exy, Eyy). The inversion is a bounded least squares inversion with optional spatial smoothing of slip deficit rate. Gaussian or truncated Gaussian priors on slip deficit rate can be included. Strain rates are computed on a triangular mesh constructed from surface traces of the fault model to minimize strain singularity artifacts. Details are provided in Johnson et al. (2022).   
 
