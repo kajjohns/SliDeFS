@@ -170,11 +170,12 @@ Esig = [Exx_std;Exy_std;Eyy_std];
 d = [Exx_mean;Exy_mean;Eyy_mean];
 
 if use_Gaussian_prior
-    Gprior = diag(1./std_s_prior);
     dd = [d./Esig; mean_s_prior./std_s_prior;zeros(size(pm_smooth,1),1)];
     if variable_rake
+        Gprior = [diag(1./std_s_prior) zeros(length(std_s_prior)]; % Augmented with zeros
         GG = [G./repmat(Esig,1,size(G,2));Gprior;weight_smooth*[pm_smooth pm_smooth]];
     else
+        Gprior = diag(1./std_s_prior);
         GG = [G./repmat(Esig,1,size(G,2));Gprior;weight_smooth*pm_smooth];
     end
 else
