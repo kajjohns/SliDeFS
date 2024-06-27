@@ -4,7 +4,7 @@
 %%INPUT SECTION
 
 %name of file generated from build_backslip_GreenFunctions
-build_filename = 'CSAF';
+build_filename = 'NoCal_bodyforce_moment_novisco';
 
 %regular grid? True or false. If true, provide grid spacing in degrees
 %below. If grid is not regular, specify false
@@ -15,20 +15,20 @@ dl =0.2;  %grid spacing (degrees, needed if above is true)
 
 %allow for variable rake? If true, two components of slip will be computed
 %(twice the computation time, if false, rake is fixed 
-variable_rake = false;
+variable_rake = true;
 
 %weight placed on minimizing deviation from rake (if true above)
-rake_weight = 100;
+weight_rake = 1;
 
 %use elastic-only solution (ignore viscoelastic cycle GFs)
-use_elastic = true;
+use_elastic = false;
 
 %Gaussian slip deficit rate prior?
-use_Gaussian_prior = false;  %true/false, use Guassian slip rate prior
+use_Gaussian_prior = true;  %true/false, use Guassian slip rate prior
                             %NOTE: if true, pref_slip_rate must be defined 
                             %if true, std_slip_rate must be defined or set use_bounds_for_std = true;
 use_bounds_for_std = true;  %true/false (only relevant if above is true), if true std of slip rate is (ub-lb)*std_scale
-std_scale = .5;
+std_scale = .1;
 
 %use bounds on slip deficit rate?   
 use_upper_bounds = true;  %true to use upper bounds
@@ -41,16 +41,24 @@ scale_lower_bounds = 1;   %optional scaling of lower bounds, =1 for no scaling
 
 %smoothing weight (weight placed on keeping slip deficit rate smooth vs.
 %fitting data
-weight_smooth = .001;  
-                         
+weight_smooth = 1;  
+
+%include distributed moment sources?
+include_moment = true;
+
+%damping weight for moment forces (weight to keep moment forces small)
+weight_moment = 1;  
+
 
 %%END INPUT
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-%scale weights to order of magntiude of strain rates
-rake_weight = 10^6*rake_weight;
-weight_smooth = 10^6*weight_smooth;
+%scale weights to improve relative weighting
+weight_moment = 10^3*weight_moment;
+weight_smooth = 10^3*weight_smooth;
+weight_rake = 10^3*weight_rake;
+
 
 addpath backslip_tools
 addpath tools
@@ -60,14 +68,6 @@ load(build_filename)
 
 %make smoothing operator
 make_pm_smoothing
-
-%check for variable rake GFs
-if variable_rake
-    if ~exist('GExx_top_cycle_perp')
-        disp('Variable rake GFs were not computed. Script terminated.')
-        return
-    end
-end
 
 
 if use_elastic
@@ -116,6 +116,7 @@ end
 
 
 
+
 G = [GExx_top GExx;...
       GExy_top GExy; ...
       GEyy_top GEyy];
@@ -130,7 +131,22 @@ if variable_rake
     
 end
 
+if include_moment
+
+    %moment sources
+    Gmom = [Gexx_mom.m11 Gexx_mom.m12 Gexx_mom.m22];
+    Gmom = [Gmom; [Gexy_mom.m11 Gexy_mom.m12 Gexy_mom.m22]];
+    Gmom = [Gmom; [Geyy_mom.m11 Geyy_mom.m12 Geyy_mom.m22]];
+    Gmom = Gmom*10^-3;  %improve scaling
     
+    G = [G Gmom];  
+
+else
+    Gmom = [];
+end
+
+
+
 %bounds
 if use_upper_bounds
     UB = [ub_top_patches; ub_patches]/1000;  %convert to m/yr
@@ -141,10 +157,10 @@ end
 
 if use_lower_bounds
     LB = [lb_top_patches; lb_patches]/1000;  %convert to m/yr
-    if variable_rake; LB = [LB; LB]; end
+    if variable_rake; LB = [LB; -LB]; end
 else
     LB = [0*ub_top_patches; 0*ub_patches];
-    if variable_rake; LB = [LB; LB]; end
+    if variable_rake; LB = [LB; -UB]; end
 end
 
 UB = UB*scale_upper_bounds;
@@ -169,36 +185,68 @@ end
 Esig = [Exx_std;Exy_std;Eyy_std];
 d = [Exx_mean;Exy_mean;Eyy_mean];
 
-if use_Gaussian_prior
-    dd = [d./Esig; mean_s_prior./std_s_prior;zeros(size(pm_smooth,1),1)];
-    if variable_rake
-        Gprior = [diag(1./std_s_prior) zeros(length(std_s_prior)]; % Augmented with zeros
-        GG = [G./repmat(Esig,1,size(G,2));Gprior;weight_smooth*[pm_smooth pm_smooth]];
-    else
-        Gprior = diag(1./std_s_prior);
-        GG = [G./repmat(Esig,1,size(G,2));Gprior;weight_smooth*pm_smooth];
-    end
+
+%backslip weighting matrix, W
+if variable_rake
+        W = [weight_smooth*[pm_smooth pm_smooth] zeros(size(pm_smooth,1),size(Gmom,2))];
 else
-    dd = [d./Esig;zeros(size(pm_smooth,1),1)];
-     if variable_rake
-        GG = [G./repmat(Esig,1,size(G,2));weight_smooth*[pm_smooth pm_smooth]];
-     else
-         GG = [G./repmat(Esig,1,size(G,2));weight_smooth*pm_smooth];
-     end   
+        W = [weight_smooth*pm_smooth zeros(size(pm_smooth,1),size(Gmom,2))];
 end
 
+if use_Gaussian_prior
+
+    if variable_rake
+    
+        Gprior = [diag(1./std_s_prior) zeros(length(std_s_prior))];
+        Gprior = [Gprior zeros(size(Gprior,1),size(Gmom,2))];  %zeros for moment source terms
+        dd = [d./Esig; mean_s_prior./std_s_prior;zeros(size(pm_smooth,1),1)];
+        GG = [G./repmat(Esig,1,size(G,2));Gprior;W];
+
+    else
+
+        Gprior = diag(1./std_s_prior);
+        Gprior = [Gprior zeros(size(Gprior,1),size(Gmom,2))];  %zeros for moment source terms
+        dd = [d./Esig; mean_s_prior./std_s_prior;zeros(size(pm_smooth,1),1)];
+        GG = [G./repmat(Esig,1,size(G,2));Gprior;W];
+
+    end
+
+else
+
+    dd = [d./Esig;zeros(size(pm_smooth,1),1)];
+    GG = [G./repmat(Esig,1,size(G,2));W];
+
+end
+
+%damp rake-perp component of slip
+N = size(pm,1)+size(pm_top,1); %number of slip patches
 if variable_rake
-   %damp rake-perp component of slip 
-   N = size(pm,1)+size(pm_top,1);
-   Gperp = [zeros(N,N) rake_weight*eye(N,N)];
-   GG = [GG; Gperp];
+   Gdamp_perp = [zeros(N,N) weight_rake*eye(N,N) zeros(N,size(Gmom,2))];
+   GG = [GG; Gdamp_perp];
    dd = [dd; zeros(N,1)];
 end
 
+%damp moment forces
+M = size(Gmom,2);
+if variable_rake
+    Gdamp = [zeros(M,2*N) weight_moment*eye(M)];
+else
+    Gdamp = [zeros(M,N) weight_moment*eye(M)];
+end
+
+GG = [GG; Gdamp];
+dd = [dd; zeros(size(Gdamp,1),1)];
+
 
 %bounded least squares result
-mhat = lsqlin(GG,dd,[],[],[],[],LB,UB);
+warning off  %turn off warnings about bounds being set to +/- inf which is totally fine, if not a bit sloppy
+options = optimoptions(@lsqlin,'Display','iter');
+display('lsqlin iteration status:')
+mhat = lsqlin(GG,dd,[],[],[],[],LB,UB,[],options);
+warning on
 
+mhat_bs = mhat(1:end-M);
+mhat_mom = mhat(end-M+1:end);
 
 %predicted strain rates
 dhat = G*mhat;
@@ -206,57 +254,59 @@ dhat = G*mhat;
 %reduced chi-squared
 chi2 = (d./Esig-dhat./Esig)'*(d./Esig-dhat./Esig)/length(d)
 
+%variance reduction
 data_Var = (d)'*(d);
 resid_Var = (d-dhat)'*(d-dhat);
-
 var_reduction = 1 - resid_Var/data_Var
 
-    
-    
-    
-    
-
+   
 
 % compute moments from backslip
 A_top = pm_top(:,1).*pm_top(:,2)*10^6;
 A_bot = pm(:,1).*pm(:,2)*10^6;
 
-  
-        
-Exx_bs = dhat(1:end/3);
-Exy_bs = dhat(1+end/3:2*end/3);
-Eyy_bs = dhat(1+2*end/3:end);
-  
-    
-Exx_offfault = Exx_mean - Exx_bs;
-Exy_offfault = Exy_mean - Exy_bs;
-Eyy_offfault = Eyy_mean - Eyy_bs;
+Exx_total = dhat(1:end/3);
+Exy_total = dhat(1+end/3:2*end/3);
+Eyy_total = dhat(1+2*end/3:end);
 
-max_shear = 10^6*sqrt((Exx_mean-Eyy_mean).^2 + Exy_mean.^2); %convert to micro-strain/yr
+if variable_rake
+    dhat_bs = G(:,1:2*N)*mhat_bs;
+else
+    dhat_bs = G(:,1:N)*mhat_bs;
+end
+
+%strain rates from backslip
+Exx_bs = dhat_bs(1:end/3);
+Exy_bs = dhat_bs(1+end/3:2*end/3);
+Eyy_bs = dhat_bs(1+2*end/3:end);
+ 
+%strain rates from distributed sources
+dhat_mom = Gmom*mhat_mom;  
+Exx_bf = dhat_mom(1:end/3);
+Exy_bf = dhat_mom(1+end/3:2*end/3);
+Eyy_bf = dhat_mom(1+2*end/3:end);
+
+
+max_shear = 10^6*sqrt((Exx_mean-Eyy_mean).^2 + Exy_mean.^2); %observed, convert to micro-strain/yr
 max_shear_bs = 10^6*sqrt((Exx_bs-Eyy_bs).^2 + Exy_bs.^2);
+max_shear_bf = 10^6*sqrt((Exx_bf-Eyy_bf).^2 + Exy_bf.^2);
+max_shear_total = 10^6*sqrt((Exx_total-Eyy_total).^2 + Exy_total.^2);
 
 dilatation = 10^6*(Exx_mean + Eyy_mean);
 dilatation_bs = 10^6*(Exx_bs + Eyy_bs);
+dilatation_bf = 10^6*(Exx_bf + Eyy_bf);
+dilatation_total = 10^6*(Exx_total + Eyy_total);
 
-max_shear_offfault = 10^6*sqrt(((Exx_mean-Exx_bs)-(Eyy_mean-Eyy_bs)).^2 + (Exy_mean-Exy_bs).^2);
-dilatation_offfault = 10^6*((Exx_mean-Exx_bs)+(Eyy_mean-Eyy_bs));
+max_shear_residual = 10^6*sqrt(((Exx_mean-Exx_total)-(Eyy_mean-Eyy_total)).^2 + (Exy_mean-Exy_total).^2);
+dilatation_residual = 10^6*((Exx_mean-Exx_total)+(Eyy_mean-Eyy_total));
 
-%compute moments
-H=15;
-mu=30e9;
-% 
-% 
-% Kostrov_Mo_total =    Kostrov(xy_obs(:,1),xy_obs(:,2),Exx_mean,Exy_mean,Eyy_mean,H,mu);
-% Kostrov_Mo_bs =       Kostrov(xy_obs(:,1),xy_obs(:,2),Exx_bs,Exy_bs,Eyy_bs,H,mu);
-% Kostrov_Mo_offfault = Kostrov(xy_obs(:,1),xy_obs(:,2),Exx_offfault,Exy_offfault,Eyy_offfault,H,mu);
-% 
-%     
+
 
 if variable_rake
-    mhat_rake = mhat(1:end/2); %slip in rake direction
-    mhat_perp = mhat(1+end/2:end); %slip in rake-perpendicular direction
+    mhat_rake = mhat_bs(1:end/2); %slip in rake direction
+    mhat_perp = mhat_bs(1+end/2:end); %slip in rake-perpendicular direction
 else
-    mhat_rake = mhat;
+    mhat_rake = mhat_bs;
 end
 
 bs_top_rake = mhat_rake(1:size(pm_top,1));
@@ -301,11 +351,57 @@ else
 
 end
 
+%% compute on-fault and off-fault moment
+H=20; %effective elastic thickness
+mu=30e9; %shear modulus
+ 
 
-Mo_fault_rec = mu*sum(A_top.*bs_top)+mu*sum(A_bot.*bs_bot);
-Mo_fault_rec_bot = mu*sum(A_bot.*bs_bot);
+%on fault
+%note about units; bs i m/yr, Areas in meters, so Mo is N*m/yr
+Mo_fault = mu*sum(A_top.*bs_top)+mu*sum(A_bot.*bs_bot) + mu*sum(A_bot.*bs_bot);
 
+%off fault (distributed moments)
+
+%Here we want to convert the weights (mhat_mom) on the moment sources to units of
+%Moment [Force*distance, N*m]. The weights are moment normalized by plate
+%thickness, H, and elastic shear modulus, mu
+%
+%two considerations in converting sources to moments in units of N*m
+%1. force-couple GFs (Gmom matrix) are in units of 1/L^2 where Length is in km (need to
+%convert to meters). But note that Gmom was already rescaled (for improve scaling
+%for lsq inversion) as Gmom = Gmom*10^-3. So another factor of 10^-3 needs
+%to be applied to convert GFs to units of 1/m^2
+%2. After considering conversion of Gmom in step 1 (i.e., multiply weights by 1e3), weights on 
+%moment terms are in units of moment normalized by mu*H.  
+
+
+%convert mhat_mom to moments
+mu = 3.0000e+10;
+H = 25000; %average crustal thickness, meters
+conv = 1e3*mu*H;  %conversion factor (see notes above)
+m11 = mhat_mom(1:end/3)*conv; %dipole, force couple
+m12_m21 = mhat_mom(1+end/3:2*end/3)*conv; %this is actually double couple m12+m21
+m22 = mhat_mom(1+2*end/3:end)*conv; %dipole, force couple
+
+%compute deviatoric moment tensor to get moment (Mo) of double-couple representions
+for j=1:length(m11)
+    E = [m11(j)-(m11(j)+m22(j))/2 .5*m12_m21(j); .5*m12_m21(j) m22(j)-(m11(j)+m22(j))/2] ;
+    [vec,val] = eig(E);
+    Mo(j) = abs(val(1,1));
+end
+
+Mo_off = sum(Mo);  %off-fault moment computed as the total double couple moment
+
+
+%print moments
+disp(['On-fault moment accumulation rate: ' num2str(Mo_fault) ' Nm/yr'])
+disp(['Off-fault moment rate (double couples): ' num2str(Mo_off) ' Nm/yr'])
+disp(['Total (on+ff) moment rate : ' num2str(Mo_fault + Mo_off) ' Nm/yr'])
+disp(['Percent of total due to on-fault: ' num2str(Mo_fault/(Mo_fault + Mo_off)*100) '%'])
+disp(['Percent of total due to off-fault: ' num2str(Mo_off/(Mo_fault + Mo_off)*100) '%'])
 
 SegEnds_llh1 = local2llh(SegEnds(:,1:2)',fliplr(origin))';
 SegEnds_llh2 = local2llh(SegEnds(:,3:4)',fliplr(origin))';
 SegEnds_llh = [SegEnds_llh1 SegEnds_llh2];
+
+nodes_llh = local2llh(nodes',fliplr(origin))';

@@ -8,7 +8,7 @@
 
 %list of fault names to plot (note, only part of the name needs to be in
 %the list to include the fault 
-plot_names = {'San Andreas','Calaveras','Hosgri'};
+plot_names = {'San Andreas','Bartlett Springs','Maacama'};
 
 
 %END INPUT
@@ -16,7 +16,9 @@ plot_names = {'San Andreas','Calaveras','Hosgri'};
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-
+%number of slip patches
+numslip = size(pms,1);
+all_slip_Ms = all_Ms(1:numslip,:); %extract slip rates (exclude moment sources)
 
 for k=1:length(FaultInfo)
 FaultID(k) = FaultInfo{k}.FaultID;
@@ -29,9 +31,11 @@ for k=1:size(SegEnds,1)
     fault_name{k} =  FaultNames{ind};  
 end
 
+
+
 %compute depth-averaged slip rate samples
-top_row_samples_s = all_Ms(1:end/nve,:);
-bottom = all_Ms(1+end/nve:end,:);
+top_row_samples_s = all_slip_Ms(1:end/nve,:);
+bottom = all_slip_Ms(1+end/nve:end,:);
 sum_bottom_rows = zeros(size(top_row_samples_s));
 for k=1:nve-1
     sum_bottom_rows = sum_bottom_rows + bottom(k:nve-1:end,:);

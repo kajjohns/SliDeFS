@@ -8,7 +8,8 @@ clear all
 %origin of Cartensian coordinate system
 %NOTE: this needs to be same origin used in generation of the mesh
 %SegEnds cooredinates in FaultInfo
-origin = [36 -117];
+origin = [39 -121];
+
 
 
 
@@ -22,6 +23,10 @@ origin = [36 -117];
 %     FaultInfo{k}.FaultName, string, name of fault
 %     FaultInfo{k}.FaultID, ID number associated with fault, scalar
 %     FaultInfo{k}.Dip, dip angle (degrees), scalar
+%     FaultInfo{k}.Dip_Bottom, dip angle (degrees) at bottom of fault, scalar
+%     NOTE: Fault dip will vary linearlar from top (FaultInfo{k}.Dip) to
+%           bottom (FaultInfo{k}.Dip_Bottom). FaultInfo{k}.Dip_Bottom defaults to 
+%           uniform dip if not specified 
 %     FaultInfo{k}.Rake, rake angle (degrees), scalar
 %     FaultInfo{k}.PrefSlipRate, preffered slip rate (mm/yr), scalar  
 %     FaultInfo{k}.UBSlipRate, upper bound on slip rate (mm/yr), scalar   
@@ -38,21 +43,21 @@ origin = [36 -117];
 
 %allow for variable rake? If true, two components of slip will be computed
 %(twice the computation time
-variable_rake = false;
+variable_rake = true;
 
 %  average coseismic slip (meters) used to define default recurrence time 
 coseismic_slip = 5;  %e.g., recurrence time = coseismic_slip*1000/PrefSlipRate
 
 %default time since last earthqake as a fraction of the earthqake
 %recurrence time
-t_eq_frac = 0.75;
+t_eq_frac = 0.2;
 
 %name of fault info file
-faultinfo_name = './build_mesh/fault_info_CSAF.mat'; 
+faultinfo_name = './build_mesh/fault_info_NoCal_novisco.mat'; 
 
 
 %% mesh file name (mat file)
-meshfile =  './build_mesh/CSAF_mesh';
+meshfile =  './build_mesh/NoCal_mesh';
 
 
 %% slip patch discretization
@@ -64,7 +69,7 @@ DLock_max = 20;  %maximum depth of locking (depth to bottom of patches)
                  %variable depths
 
  %all variables will be save to floowing name of file (mat file) 
- build_filename = 'CSAF';
+ build_filename = 'NoCal_bodyforce_moment_novisco';
                  
 
 %load strainrate file (text file containing strain rate 'observations') 
@@ -73,13 +78,14 @@ DLock_max = 20;  %maximum depth of locking (depth to bottom of patches)
 %rates in micro-strain/yr, set is_microstrain = true
 %
 %NOTE: observations outside of model domain (meshed region) will be tossed
-%out, or you can specify boundaries outside of which data is tosse out
+%out, or you can specify boundaries outside of which data is tossed out
 strainrates_obs = './data/BforStrain_WUS_9_28_2022_smooth_trimesh.txt'; %note, micro-strain/yr
 is_microstrain = true;
 
-obs_limits = true;  %true or false, if true, data outside of limits (below) will be removed
-obs_xmin = -500; obs_xmax = -200;
-obs_ymin = -50; obs_ymax = 120;
+obs_limits = false;  %true or false, if true, data outside of limits (below) will be removed
+obs_xmin = -300; obs_xmax = 0;
+obs_ymin = -150; obs_ymax = 150;
+
 
 
 %specify refinement for top row of slip patches (refined slip patch
@@ -109,6 +115,8 @@ H2=50;  %depth to bottom of viscoelastic layer
 tR1= 50; % relaxation time of viscoelastic layer (years)
 tR2= 10;  %relaxation time of halfspace  (years)
 
+%Poisson's ratio for distributed moment sources
+nu = 0.25;
 
 
 %END INPUT
@@ -168,16 +176,20 @@ Exx_std(outside) = [];
 Exy_std(outside) = [];
 Eyy_std(outside) = [];
 
+
 %specified boundaries for data
-outside = xy_obs(:,1)<obs_xmin |  xy_obs(:,1)>obs_xmax |  xy_obs(:,2)<obs_ymin | xy_obs(:,2)>obs_ymax;
-xy_obs(outside,:) = [];
-obs_llh(outside,:) = [];
-Exx_mean(outside) = [];
-Exy_mean(outside) = [];
-Eyy_mean(outside) = [];
-Exx_std(outside) = [];
-Exy_std(outside) = [];
-Eyy_std(outside) = [];
+if obs_limits
+    outside = xy_obs(:,1)<obs_xmin |  xy_obs(:,1)>obs_xmax |  xy_obs(:,2)<obs_ymin | xy_obs(:,2)>obs_ymax;
+    xy_obs(outside,:) = [];
+    obs_llh(outside,:) = [];
+    Exx_mean(outside) = [];
+    Exy_mean(outside) = [];
+    Eyy_mean(outside) = [];
+    Exx_std(outside) = [];
+    Exy_std(outside) = [];
+    Eyy_std(outside) = [];
+end
+
 
 %% extract triangular mesh info 
 patch_stuff=make_triangular_patch_stuff(tri,[nodes 0*nodes(:,1)]);
@@ -207,6 +219,7 @@ make_patches_backslip_deep_variableH
     build_G_backslip_function(G1Exx_top,G2Exx_top,G1Exy_top,G2Exy_top,G1Eyy_top,G2Eyy_top,pm_top_seg_num);
 %clear variables no longer needed
 clear G1Exx_top G2Exx_top G1Exy_top G2Exy_top G1Eyy_top G2Eyy_top
+
 
 if variable_rake
     
@@ -408,6 +421,9 @@ if variable_rake
     GEyy_elastic_perp = -GEyy_perp;
 end
 
+
+%build 2d moment source GFs (distributed moment sources)
+[Gexx_mom,Gexy_mom,Geyy_mom] = buildG_MomentSource_2d(tri_centroids,xy_obs,nodes,nu);
 
 %only keep the strain rates on the fine triangular based mesh if requested
 %these are large matrices 
