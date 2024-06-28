@@ -6,7 +6,7 @@
 %
 %
 
-vecscale = 2;  %scale for plotting vectors
+vecscale = 5;  %scale for plotting vectors
 
 %sizse of scale bar for legend, Nm/yr
 legend_scale = 2*10^16; 
