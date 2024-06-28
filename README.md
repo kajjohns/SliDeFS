@@ -1,7 +1,7 @@
 [![DOI](https://zenodo.org/badge/616735576.svg)](https://zenodo.org/badge/latestdoi/616735576)
 
 # SliDeFS
-SliDeFS (Slip Deficit From Strain) is a method for inverting surface strain rate components for slip deficit rate on faults as described in Johnson et al. (2022). Faults are discretized into rectangular slip patches and the Okada (1985) solution is used to relate slip deficit rate (backslip) to surface strain rates (Exx, Exy, Eyy). The inversion is a bounded least squares inversion with optional spatial smoothing of slip deficit rate. Gaussian or truncated Gaussian priors on slip deficit rate can be included. Strain rates are computed on a triangular mesh constructed from surface traces of the fault model to minimize strain singularity artifacts. Details are provided in Johnson et al. (2022).   
+SliDeFS (Slip Deficit From Strain) is a method for inverting surface strain rate components for slip deficit rate on faults as described in Johnson et al. (2024, see citation at bottom). The most recent release of SliDeFS inverts for slip deficit rates on faults and distributed moment sources. Faults are discretized into rectangular slip patches and the Okada (1985) solution is used to relate slip deficit rate (backslip) to surface strain rates (Exx, Exy, Eyy). Off-fault moment sources are represented with analytical solutions for force couples in a thin elastic plate (plane stress elasticity). The inversion is a bounded least squares inversion with optional spatial smoothing of slip deficit rate and damping of moment sources. Gaussian or truncated Gaussian priors on slip deficit rate can be included. Strain rates are computed on a triangular mesh constructed from surface traces of the fault model to minimize strain singularity artifacts. Details are provided in Johnson et al. (2022). Moment sources are computed at nodes of the same triangular mesh used for the slip deficit rate calculations. This mesh can be quite dense in areas of fault complexity. It would not be difficult to modify the code to utilize a different, simpler, mesh for the moment sources, but this has not been coded into the current release. 
 
 A brief listing of the workflow steps is provided here followed by more detailed explanations below. 
 
@@ -13,11 +13,13 @@ where strain rates and standard deviations are in units of 1/yr or   micro-strai
 The remaining steps are all conducted in the main SliDeFS folder. 
 
 3. Run build_backslip_GreensFunctions.m.  Will take a few minutes for relatively small problem (100-200 segments) up to several hours for a large problem (thousands of segments).
-4. Run invert_strainrate_for_backslip.m. Will t
+4. Run invert_strainrate_for_backslip.m. Will take a few seconds for small problems and up to ~15-20 minutes for large problems. 
 5. Run plot_best_fitting.m to view inversion results. 
 6. (optional) Run plot_principal_directions.m to view observed and model principal strain rate directions
 7. (optional) Run sample_posterior.m to compute posterior distribution of slip deficit rate.  (minutes to hours depending on size of problem)
 8. (optional – requires step 7) Run plot_slip_rates_along_faults.m to visualize depth-averaged slip deficit rates along specified faults. 
+9. (optional – requires step 7) Run plot_moment_sources.m to visualize the spatial distribution of principal moment rate sources and uncertainties. 
+
 
 
 
@@ -26,7 +28,7 @@ The remaining steps are all conducted in the main SliDeFS folder.
 
 More detailed description of workflow. 
 
-1. Prepare the fault geometry and create FaultInfofile. I have included an example, fault_info_CSAF.mat, for central San Andreas Fault. The method assumes rectangular, planar fault sections defined with a strike and dip using the right-hand rule -- thumb with palm down points in direction of strike (thumb points from first endpoint of segment towards second endpoint)  and index finger in direction of positive dip angle (between 0 and 90 degrees). You need to build the FaultInfo mat file that contains a cell array of fault information as shown below. Each entry of the array is for a fault comprised of smaller segments (often many). Rake is defined as the angle in the fault plane between the slip vector and the strike vector. Zero degree rake is left-lateral, +/-180 is right lateral, 90 is reverse and -90 is normal sense of slip.      
+1. Prepare the fault geometry and create FaultInfo file. I have included an example, fault_info_CSAF.mat, for central San Andreas Fault. The method assumes rectangular, planar fault sections defined with a strike and dip using the right-hand rule -- thumb with palm down points in direction of strike (thumb points from first endpoint of segment towards second endpoint)  and index finger in direction of positive dip angle (between 0 and 90 degrees). You need to build the FaultInfo mat file that contains a cell array of fault information as shown below. Each entry of the array is for a fault comprised of smaller segments (often many). Rake is defined as the angle in the fault plane between the slip vector and the strike vector. Zero degree rake is left-lateral, +/-180 is right lateral, 90 is reverse and -90 is normal sense of slip.      
 
 % this needs to be a mat file that contains a cell array of FaultInfo
 % structures for each fault in the model. For the k-th fault, FaultInfo{k}
@@ -84,7 +86,7 @@ More detailed description of workflow.
 
 8. (optional – requires step 7) Run plot_slip_rates_along_faults.m to visualize depth-averaged slip deficit rates along specified faults. In the INPUT SECTION, provide a list of fault names (or partial fault names). Any fault name containing the name in the list will be plotted.
 
-
+9. (optional – requires step 7) Run plot_moment_sources.m to visualize principal directions of moment rate sources and confidence regions. In the INPUT SECTION you can change the size of the principal direction vectors and change the legend scale bar. 
 
 Reference:
-Johnson KM, Wallace LM, Maurer J, Hamling IJ, Williams CA, Rollins C, Gerstenberger MC, Van Dissen RJ. 2022. Geodetic deformation model for the 2022 update of the New Zealand National Seismic Hazard Model. Lower Hutt (NZ): GNS Science. 62 p. (GNS Science report; 2021/37). doi:10.21420/P93X-8293.
+Johnson, K. M., Wallace, L. M., Maurer, J.,Hamling, I., Williams, C., Rollins, C., et al.(2024). Inverting geodetic strain rates forslip deficit rate in complex deforming zones: An application to the New Zealandplate boundary. Journal of GeophysicalResearch: Solid Earth, 129,e2023JB027565.  https://doi.org/10.1029/2023JB027565
