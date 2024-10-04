@@ -53,11 +53,13 @@ coseismic_slip = 5;  %e.g., recurrence time = coseismic_slip*1000/PrefSlipRate
 t_eq_frac = 0.2;
 
 %name of fault info file
-faultinfo_name = './build_mesh/fault_info_NoCal_novisco.mat'; 
+%faultinfo_name = './build_mesh/fault_info_NoCal_novisco.mat'; 
+faultinfo_name = './build_mesh/fault_info_CSAF_novisco.mat'; 
 
 
 %% mesh file name (mat file)
-meshfile =  './build_mesh/NoCal_mesh';
+%meshfile =  './build_mesh/NoCal_mesh';
+meshfile =  './build_mesh/CSAF_mesh';
 
 
 %% slip patch discretization
@@ -68,8 +70,9 @@ DLock_max = 20;  %maximum depth of locking (depth to bottom of patches)
                  %vector the length of number of fault segments for
                  %variable depths
 
- %all variables will be save to floowing name of file (mat file) 
- build_filename = 'NoCal_bodyforce_moment_novisco';
+%all variables will be save to floowing name of file (mat file) 
+%build_filename = 'NoCal_bodyforce_moment_novisco';
+build_filename = 'CSAF_bodyforce_moment_novisco';
                  
 
 %load strainrate file (text file containing strain rate 'observations') 
@@ -165,6 +168,7 @@ minx = min(tri_centroids(:,1));
 maxx = max(tri_centroids(:,1));
 miny = min(tri_centroids(:,2));
 maxy = max(tri_centroids(:,2));
+
 
 outside = xy_obs(:,1)<minx |  xy_obs(:,1)>maxx |  xy_obs(:,2)<miny | xy_obs(:,2)>maxy;
 xy_obs(outside,:) = [];
@@ -423,7 +427,7 @@ end
 
 
 %build 2d moment source GFs (distributed moment sources)
-[Gexx_mom,Gexy_mom,Geyy_mom] = buildG_MomentSource_2d(tri_centroids,xy_obs,nodes,nu);
+[Gexx_mom,Gexy_mom,Geyy_mom] = buildG_MomentSource_2d(xy_obs,tri, nodes,tri_centroids,nu);
 
 %only keep the strain rates on the fine triangular based mesh if requested
 %these are large matrices 

@@ -27,7 +27,7 @@ plot_moment = true;
 
 
 %scale the size of strain rate axes for plotting
-vecscale = 1;
+vecscale = .5;
 
 %scale the size of moment rate axes for plotting
 vecscale_mom = 1;
@@ -618,7 +618,7 @@ title('Principal strain rates --  backslip contribution')
 
 
 
-%body force
+%moment sources
 clear minVecs maxVecs minvals maxvals
 
 for j=1:size(Exx_bf,1)
@@ -768,7 +768,7 @@ plot(SegEnds_llh(:,[1 3])',SegEnds_llh(:,[2 4])','k','linewidth',1)
 set(gca,'fontsize',15)
 axis equal; axis tight
 f.Position = [154    68   735   758];
-title('Strain Rate Style -- body force contribution,red=reverse, green=ss, blue=normal')
+title('Strain Rate Style -- moment contribution,red=reverse, green=ss, blue=normal')
 
 
 if plot_moment & include_moment
@@ -800,8 +800,8 @@ f=figure;
 hold on
 
 
-%plot moment source directions
-vecscale_mom = vecscale_mom*10^-17;
+%plot moment source directions (normalized by area)
+vecscale_mom = vecscale_mom*10^-14;
 
 for k=1:length(m11)
     
@@ -810,21 +810,21 @@ for k=1:length(m11)
     
     if abs(minvals(k))>abs(maxvals(k))
         
-        bigvals = minvals(k);
-        smallvals = maxvals(k);
+        bigvals = minvals(k)/tri_areas(k);
+        smallvals = maxvals(k)/tri_areas(k);
         
-        bigVecs = minVecs(:,k);
-        smallVecs = maxVecs(:,k);
+        bigVecs = minVecs(:,k)/tri_areas(k);
+        smallVecs = maxVecs(:,k)/tri_areas(k);
         
 
                 
     else
         
-        bigvals = maxvals(k);
-        smallvals = minvals(k);        
+        bigvals = maxvals(k)/tri_areas(k);
+        smallvals = minvals(k)/tri_areas(k);        
     
-        bigVecs = maxVecs(:,k);
-        smallVecs = minVecs(:,k);
+        bigVecs = maxVecs(:,k)/tri_areas(k);
+        smallVecs = minVecs(:,k)/tri_areas(k);
 
     end
        
@@ -834,8 +834,8 @@ for k=1:length(m11)
        
 
             %plot larger principal direction 
-            vx = [nodes_llh(k,1)-bigVecs(1)*bigvals*vecscale_mom nodes_llh(k,1)+bigVecs(1)*bigvals*vecscale_mom];
-            vy = [nodes_llh(k,2)-bigVecs(2)*bigvals*vecscale_mom nodes_llh(k,2)+bigVecs(2)*bigvals*vecscale_mom];
+            vx = [tri_centroids_llh(k,1)-bigVecs(1)*bigvals*vecscale_mom tri_centroids_llh(k,1)+bigVecs(1)*bigvals*vecscale_mom];
+            vy = [tri_centroids_llh(k,2)-bigVecs(2)*bigvals*vecscale_mom tri_centroids_llh(k,2)+bigVecs(2)*bigvals*vecscale_mom];
 
 
             if bigvals<0
@@ -846,8 +846,8 @@ for k=1:length(m11)
 
 
             %plot smaller principal direction 
-            vx = [nodes_llh(k,1)-smallVecs(1)*vecscale_mom*smallvals nodes_llh(k,1)+smallVecs(1)*vecscale_mom*smallvals];
-            vy = [nodes_llh(k,2)-smallVecs(2)*vecscale_mom*smallvals nodes_llh(k,2)+smallVecs(2)*vecscale_mom*smallvals];
+            vx = [tri_centroids_llh(k,1)-smallVecs(1)*vecscale_mom*smallvals tri_centroids_llh(k,1)+smallVecs(1)*vecscale_mom*smallvals];
+            vy = [tri_centroids_llh(k,2)-smallVecs(2)*vecscale_mom*smallvals tri_centroids_llh(k,2)+smallVecs(2)*vecscale_mom*smallvals];
 
 
             if smallvals<0
@@ -870,12 +870,12 @@ X = xlim;
 Y = ylim;
 dY = 0.1*(Y(2)-Y(1));
 scale_pos = [X(1)+0.1*(X(2)-X(1)) Y(1)-dY];
-scaleval=10^16;
+scaleval=10^13;
 vx = [scale_pos(1)-vecscale_mom*scaleval scale_pos(1)+vecscale_mom*scaleval];
 vy = [scale_pos(2) scale_pos(2)];
 plot(vx,vy,'r','linewidth',1)
 plot(vx,vy-dY/2,'b','linewidth',1)
-text(scale_pos(1)-vecscale_mom*scaleval,scale_pos(2)+dY/2,['Scale, ' num2str(scaleval) ' Nm/yr'])
+text(scale_pos(1)-vecscale_mom*scaleval,scale_pos(2)+dY/2,['Scale, ' num2str(scaleval,'%E') ' (Nm/yr)/km^2'])
 text(scale_pos(1)+2*vecscale_mom*scaleval,scale_pos(2),' Contractional')
 text(scale_pos(1)+2*vecscale_mom*scaleval,scale_pos(2)-dY/2,' Extensional')
 set(gca,'fontsize',15)
@@ -886,11 +886,11 @@ xlim([X(1)-dX X(2)])
 ylim([Y(1)-dY Y(2)])
 
 f.Position = [154    68   735   758];
-title('Moment Sources -- Principal directions ')
+title('Moment Sources (moment per area) -- Principal directions ')
 
 
 f=figure;
-scatter(nodes_llh(:,1),nodes_llh(:,2),30,style_mom,'fill')
+scatter(tri_centroids_llh(:,1),tri_centroids_llh(:,2),30,style_mom,'fill')
 colormap(jet)
 colorbar
 hold on

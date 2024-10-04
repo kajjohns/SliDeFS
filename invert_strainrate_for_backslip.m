@@ -4,7 +4,8 @@
 %%INPUT SECTION
 
 %name of file generated from build_backslip_GreenFunctions
-build_filename = 'NoCal_bodyforce_moment_novisco';
+%build_filename = 'NoCal_bodyforce_moment_novisco';
+build_filename = 'CSAF_bodyforce_moment_novisco';
 
 %regular grid? True or false. If true, provide grid spacing in degrees
 %below. If grid is not regular, specify false
@@ -21,10 +22,10 @@ variable_rake = true;
 weight_rake = 1;
 
 %use elastic-only solution (ignore viscoelastic cycle GFs)
-use_elastic = false;
+use_elastic = true;
 
 %Gaussian slip deficit rate prior?
-use_Gaussian_prior = true;  %true/false, use Guassian slip rate prior
+use_Gaussian_prior = false;  %true/false, use Guassian slip rate prior
                             %NOTE: if true, pref_slip_rate must be defined 
                             %if true, std_slip_rate must be defined or set use_bounds_for_std = true;
 use_bounds_for_std = true;  %true/false (only relevant if above is true), if true std of slip rate is (ub-lb)*std_scale
@@ -47,7 +48,13 @@ weight_smooth = 1;
 include_moment = true;
 
 %damping weight for moment forces (weight to keep moment forces small)
-weight_moment = 1;  
+weight_moment = 2.5;  
+
+%An effective depth for off-fault moment sources is required for scaling
+%This ought to be the averge depth over which off-fault sources contributed to surface strain 
+%Total off-fault moment scales with this depth.
+%H = depth of off-fault moment  (meters) 
+H = 15000; %meters
 
 
 %%END INPUT
@@ -55,7 +62,7 @@ weight_moment = 1;
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 %scale weights to improve relative weighting
-weight_moment = 10^3*weight_moment;
+weight_moment = 10^4*weight_moment;
 weight_smooth = 10^3*weight_smooth;
 weight_rake = 10^3*weight_rake;
 
@@ -352,7 +359,6 @@ else
 end
 
 %% compute on-fault and off-fault moment
-H=20; %effective elastic thickness
 mu=30e9; %shear modulus
  
 
@@ -363,25 +369,19 @@ Mo_fault = mu*sum(A_top.*bs_top)+mu*sum(A_bot.*bs_bot) + mu*sum(A_bot.*bs_bot);
 %off fault (distributed moments)
 
 %Here we want to convert the weights (mhat_mom) on the moment sources to units of
-%Moment [Force*distance, N*m]. The weights are moment normalized by plate
-%thickness, H, and elastic shear modulus, mu
-%
-%two considerations in converting sources to moments in units of N*m
-%1. force-couple GFs (Gmom matrix) are in units of 1/L^2 where Length is in km (need to
-%convert to meters). But note that Gmom was already rescaled (for improve scaling
-%for lsq inversion) as Gmom = Gmom*10^-3. So another factor of 10^-3 needs
-%to be applied to convert GFs to units of 1/m^2
-%2. After considering conversion of Gmom in step 1 (i.e., multiply weights by 1e3), weights on 
-%moment terms are in units of moment normalized by mu*H.  
+%Moment [Force*distance, N*m]. The moment GFs are unitless.  The weights are moment normalized by plate
+%thickness, H, Area of the triangle, and elastic shear modulus, mu
+%Need to multipiply estimated weights by mu*A*H and unscale the weights by
+%10^-3 (note that Gmom was already rescaled (for improve scaling
+%for lsq inversion) as Gmom = Gmom*10^-3)
 
 
 %convert mhat_mom to moments
 mu = 3.0000e+10;
-H = 25000; %average crustal thickness, meters
-conv = 1e3*mu*H;  %conversion factor (see notes above)
-m11 = mhat_mom(1:end/3)*conv; %dipole, force couple
-m12_m21 = mhat_mom(1+end/3:2*end/3)*conv; %this is actually double couple m12+m21
-m22 = mhat_mom(1+2*end/3:end)*conv; %dipole, force couple
+conv = 1e-3*mu*H*tri_areas*10^6;  %tri_ares in km^2, convert to m^2, conversion factor (see notes above)
+m11 = mhat_mom(1:end/3).*conv; %dipole, force couple
+m12_m21 = mhat_mom(1+end/3:2*end/3).*conv; %this is actually double couple m12+m21
+m22 = mhat_mom(1+2*end/3:end).*conv; %dipole, force couple
 
 %compute deviatoric moment tensor to get moment (Mo) of double-couple representions
 for j=1:length(m11)
@@ -403,5 +403,6 @@ disp(['Percent of total due to off-fault: ' num2str(Mo_off/(Mo_fault + Mo_off)*1
 SegEnds_llh1 = local2llh(SegEnds(:,1:2)',fliplr(origin))';
 SegEnds_llh2 = local2llh(SegEnds(:,3:4)',fliplr(origin))';
 SegEnds_llh = [SegEnds_llh1 SegEnds_llh2];
+tri_centroids_llh = local2llh(tri_centroids(:,1:2)',fliplr(origin))';
 
 nodes_llh = local2llh(nodes',fliplr(origin))';
