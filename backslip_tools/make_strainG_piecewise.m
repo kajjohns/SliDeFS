@@ -24,6 +24,7 @@ for k=1:npatches
     %divide into small segments 
     nhe = ceil(pm(k,1)/refine);
     pf = patchfault(pm(k,:),nhe,1);
+    pf(:,3) = pf(:,3)+1; %small shift to avoid physically impossible error
     
     Exx1 = zeros(size(xystats,1),1);
     Exx2 = zeros(size(xystats,1),1);
@@ -38,7 +39,6 @@ for k=1:npatches
     
     for j=1:nhe
         
-        pf(:,3) = pf(:,3)+1; %small shift to avoid physically impossible error
         m1=[pf(j,:) ss ds 0]';
    
         [U1,D,S,flag]=disloc3d(m1,xloc,1,.25);

@@ -13,13 +13,13 @@ GExx = zeros(size(xystats,1),npatches);
 GExy = zeros(size(xystats,1),npatches);
 GEyy = zeros(size(xystats,1),npatches);
 
+pm(:,3) = pm(:,3)+1; %small shift to avoid physically impossible error
 
 for k=1:npatches
     
     ss= cos(rake(k)*pi/180);
     ds = sin(rake(k)*pi/180);   
     
-    pm(:,3) = pm(:,3)+1; %small shift to avoid physically impossible error
     m1=[pm(k,:) ss ds 0]';  %positive slip is R and LL sense
    
     [U1,D,S,flag]=disloc3d(m1,xloc,1,.25);
