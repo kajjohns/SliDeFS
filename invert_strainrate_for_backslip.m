@@ -109,9 +109,9 @@ else
 
     if variable_rake
         
-        GExx_top_perp = GExx_top_elastic + 1000*GExx_top_cycle_perp*10^-6; %convert from micro-strain/yr, convert from m/yr to mm/yr
-        GExy_top_perp = GExy_top_elastic + 1000*GExy_top_cycle_perp*10^-6;
-        GEyy_top_perp = GEyy_top_elastic + 1000*GEyy_top_cycle_perp*10^-6;
+        GExx_top_perp = GExx_top_elastic_perp + 1000*GExx_top_cycle_perp*10^-6; %convert from micro-strain/yr, convert from m/yr to mm/yr
+        GExy_top_perp = GExy_top_elastic_perp + 1000*GExy_top_cycle_perp*10^-6;
+        GEyy_top_perp = GEyy_top_elastic_perp + 1000*GEyy_top_cycle_perp*10^-6;
 
         GExx_perp = GExx_elastic_perp + 1000*GExx_cycle_perp*10^-6;
         GExy_perp = GExy_elastic_perp + 1000*GExy_cycle_perp*10^-6;
@@ -364,7 +364,7 @@ mu=30e9; %shear modulus
 
 %on fault
 %note about units; bs i m/yr, Areas in meters, so Mo is N*m/yr
-Mo_fault = mu*sum(A_top.*bs_top)+mu*sum(A_bot.*bs_bot) + mu*sum(A_bot.*bs_bot);
+Mo_fault = mu*sum(A_top.*bs_top)+mu*sum(A_bot.*bs_bot);
 
 %off fault (distributed moments)
 
