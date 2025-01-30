@@ -216,7 +216,7 @@ make_patches_backslip_deep_variableH
     G1Eyy_top,G2Eyy_top] = make_strainG_piecewise(pm_top,rake_top_patches,tri_centroids(:,1:2),refine);
 %combine matrices above to build G matrices
 [GExx_top_fine,GExy_top_fine,GEyy_top_fine]=...
-    build_G_backslip_function(G1Exx_top,G2Exx_top,G1Exy_top,G2Exy_top,G1Eyy_top,G2Eyy_top,pm_top_seg_num);
+    build_G_backslip_function(G1Exx_top,G2Exx_top,G1Exy_top,G2Exy_top,G1Eyy_top,G2Eyy_top,pm_top_seg_id);
 %clear variables no longer needed
 clear G1Exx_top G2Exx_top G1Exy_top G2Exy_top G1Eyy_top G2Eyy_top
 
@@ -231,7 +231,7 @@ if variable_rake
         G1Eyy_top,G2Eyy_top] = make_strainG_piecewise(pm_top,rake_top_patches+90,tri_centroids(:,1:2),refine);
     %combine matrices above to build G matrices
     [GExx_top_fine_perp,GExy_top_fine_perp,GEyy_top_fine_perp]=...
-        build_G_backslip_function(G1Exx_top,G2Exx_top,G1Exy_top,G2Exy_top,G1Eyy_top,G2Eyy_top,pm_top_seg_num);
+        build_G_backslip_function(G1Exx_top,G2Exx_top,G1Exy_top,G2Exy_top,G1Eyy_top,G2Eyy_top,pm_top_seg_id);
     %clear variables no longer needed
     clear G1Exx_top G2Exx_top G1Exy_top G2Exy_top G1Eyy_top G2Eyy_top
     
