@@ -160,7 +160,7 @@ if use_lower_bounds
     if variable_rake; LB = [LB; -LB]; end
 else
     LB = [0*ub_top_patches; 0*ub_patches];
-    if variable_rake; LB = [LB; -UB]; end
+    if variable_rake; LB = [LB; -UB(1:end/2)]; end
 end
 
 UB = UB*scale_upper_bounds;
