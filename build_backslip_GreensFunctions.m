@@ -440,5 +440,7 @@ if ~save_strainrates_centroids
 end
 
 clear variable_rake
+% H from helper function here conflicts with H defined in invert_strainrate_for_backslip.m
+clear H
 %save everything to a mat file
 save(build_filename)
