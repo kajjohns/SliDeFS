@@ -1258,6 +1258,60 @@ class Inversion:
         # Note: bs is in m/yr, Areas in m^2, so Mo is in N*m/yr
         self.Mo_fault = mu * np.sum(area_top * bs_top) + mu * np.sum(area_bot * bs_bot)
 
+        # Off-fault moment calculation
+        # Here we want to convert the weights (mhat_mom) on the moment sources to units of
+        # Moment [Force*distance, N*m]. The moment GFs are unitless.  The weights are moment normalized by plate
+        # thickness, H, Area of the triangle, and elastic shear modulus, mu
+        # Need to multipiply estimated weights by mu*A*H and unscale the weights by
+        # 10^-3 (note that Gmom was already rescaled (for improve scaling
+        # for lsq inversion) as Gmom = Gmom*10^-3)
+
+        # An effective depth for off-fault moment sources is required for scaling
+        # This ought to be the averge depth over which off-fault sources contributed to surface strain
+        # Total off-fault moment scales with this depth.
+        # H = depth of off-fault moment  (meters)
+        H = 15000; 
+        # Off-fault moment calculation (distributed moments)
+        # Conversion of weights (mhat_mom) to moments in N*m
+        conv = 1e-3*mu*H*self.mesh["tri_areas"]*1e6 # tri_ares in km^2, convert to m^2, conversion factor (see notes above)
+
+        if self.include_moment:
+            m11 = self.mhat_mom[: len(self.mhat_mom) // 3] * conv  # dipole, force couple
+            m12_m21 = (
+                self.mhat_mom[len(self.mhat_mom) // 3 : 2 * len(self.mhat_mom) // 3] * conv
+            )  # double couple m12 + m21
+            m22 = (
+                self.mhat_mom[2 * len(self.mhat_mom) // 3 :] * conv
+            )  # dipole, force couple
+
+            # Compute deviatoric moment tensor to get moment (Mo) of double-couple representations
+            Mo = []
+            for j in range(len(m11)):
+                E = np.array(
+                    [
+                        [m11[j] - (m11[j] + m22[j]) / 2, 0.5 * m12_m21[j]],
+                        [0.5 * m12_m21[j], m22[j] - (m11[j] + m22[j]) / 2],
+                    ]
+                )
+                val, _ = np.linalg.eig(E)
+                Mo.append(abs(val[0]))
+
+            self.Mo_off = np.sum(Mo) 
+        else:
+            print('Moment rate explicitly not calculated. Defaulting to zero.')
+            self.Mo_off = 0
+
+        # Print moments
+        print(f"On-fault moment accumulation rate: {self.Mo_fault:.2e} Nm/yr")
+        print(f"Off-fault moment rate (double couples): {self.Mo_off:.2e} Nm/yr")
+        print(f"Total (on+off) moment rate: {self.Mo_fault + self.Mo_off:.2e} Nm/yr")
+        print(
+            f"Percent of total due to on-fault: {self.Mo_fault / (self.Mo_fault + self.Mo_off) * 100:.2f}%"
+        )
+        print(
+            f"Percent of total due to off-fault: {self.Mo_off / (self.Mo_fault + self.Mo_off) * 100:.2f}%"
+        )
+
         self.results = {
             "strain": {
                 "Exx_obs": Exx_mean,
@@ -1307,58 +1361,11 @@ class Inversion:
             },
             "moment": {
                 "Mo_fault": self.Mo_fault,
+                "Mo_off": self.Mo_off,
             },
         }
 
         return self.results
-
-    def disp_moments(self):
-        # Constants
-
-        mu = 30e9  # shear modulus in N/m^2
-        # Off-fault moment calculation (distributed moments)
-        # Conversion of weights (mhat_mom) to moments in N*m
-        H = 25000  # average crustal thickness in meters
-        conv = 1e3 * mu * H  # conversion factor
-
-        if self.include_moment:
-            m11 = self.mhat_mom[: len(self.mhat_mom) // 3] * conv  # dipole, force couple
-            m12_m21 = (
-                self.mhat_mom[len(self.mhat_mom) // 3 : 2 * len(self.mhat_mom) // 3] * conv
-            )  # double couple m12 + m21
-            m22 = (
-                self.mhat_mom[2 * len(self.mhat_mom) // 3 :] * conv
-            )  # dipole, force couple
-
-            # Compute deviatoric moment tensor to get moment (Mo) of double-couple representations
-            Mo = []
-            for j in range(len(m11)):
-                E = np.array(
-                    [
-                        [m11[j] - (m11[j] + m22[j]) / 2, 0.5 * m12_m21[j]],
-                        [0.5 * m12_m21[j], m22[j] - (m11[j] + m22[j]) / 2],
-                    ]
-                )
-                val, _ = np.linalg.eig(E)
-                Mo.append(abs(val[0]))
-
-            self.Mo_off = np.sum(Mo) 
-        else:
-            print('Moment rate explicitly not calculated. Defaulting to zero.')
-            self.Mo_off = 0
-
-        self.results['moment']['Mo_off'] = self.Mo_off
-        # Print moments
-        print(f"On-fault moment accumulation rate: {self.Mo_fault:.2e} Nm/yr")
-        print(f"Off-fault moment rate (double couples): {self.Mo_off:.2e} Nm/yr")
-        print(f"Total (on+off) moment rate: {self.Mo_fault + self.Mo_off:.2e} Nm/yr")
-        print(
-            f"Percent of total due to on-fault: {self.Mo_fault / (self.Mo_fault + self.Mo_off) * 100:.2f}%"
-        )
-        print(
-            f"Percent of total due to off-fault: {self.Mo_off / (self.Mo_fault + self.Mo_off) * 100:.2f}%"
-        )
-
     def sample_posteriors(self, Nsamples=1000, correlation_distance = 20):
 
         mhat_unbounded = lstsq(self.GG, self.dd)[0]
@@ -1501,13 +1508,12 @@ class Inversion:
         self.set_bounds()
         # can modify inversion weighting parameters as optional arguments into normalize_and_weight()
         if self.tri_mom:
-            self.normalize_and_weight(weight_moment = 2500)
+            self.normalize_and_weight(weight_moment = 25000)
         else:
             self.normalize_and_weight(weight_moment = 1000)
 
         self.run_inversion(verbose = False)
         results = self.post_process()
-        self.disp_moments()
         return results
 
 # prints out dictionary trees. used for showing results structure
@@ -1522,5 +1528,3 @@ def print_dict_tree(d, indent=0):
             print(f": np.ndarray, shape={value.shape}")
         else:
             print(": " + type(value).__name__)
-
-
